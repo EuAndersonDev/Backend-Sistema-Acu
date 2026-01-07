@@ -14,11 +14,6 @@ app.use(express.urlencoded({ extended: true }));
 // Rotas
 app.use('/api', routes);
 
-// Rota de teste
-app.get('/', (req, res) => {
-  res.json({ message: 'API Backend Sistema ACU - Rodando!' });
-});
-
 // Sincronizar banco de dados e iniciar servidor
 const PORT = process.env.PORT || 3000;
 
@@ -31,7 +26,7 @@ const startServer = async () => {
     // Sincronizar modelos (criar tabelas)
     // Use { force: true } para recriar tabelas (CUIDADO: apaga dados!)
     // Use { alter: true } para atualizar estrutura mantendo dados
-    await db.sequelize.sync({ alter: true });
+    await db.sequelize.sync();
     console.log('✓ Modelos sincronizados com banco de dados.');
 
     // Iniciar servidor

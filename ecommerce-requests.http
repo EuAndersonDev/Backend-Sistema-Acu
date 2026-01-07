@@ -1,0 +1,409 @@
+# 🛒 ECOMMERCE API - Complete Test Collection
+# Integrado com Mercado Pago
+# Arquivo de testes com 33+ exemplos de fluxo completo
+
+@baseUrl = http://localhost:3000/api
+@token = {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 1: SETUP & AUTHENTICATION
+#################################
+
+### 1️⃣ Register new user
+# @name registerUser
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "João Silva",
+  "email": "joao{{$timestamp}}@example.com",
+  "password": "senha@123"
+}
+
+### 2️⃣ Login to get JWT token
+# @name loginUser
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{registerUser.response.body.user.email}}",
+  "password": "senha@123"
+}
+
+### 3️⃣ Get current user profile
+# @name getProfile
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 2: PRODUCT MANAGEMENT
+#################################
+
+### 4️⃣ Create product 1 - Notebook
+# @name createNotebook
+POST {{baseUrl}}/products
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Notebook Dell XPS 13",
+  "description": "Notebook com processador Intel i7, 16GB RAM, SSD 512GB",
+  "price": 5500.00,
+  "stock": 5
+}
+
+### 5️⃣ Create product 2 - Mouse
+# @name createMouse
+POST {{baseUrl}}/products
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Mouse Logitech MX Master 3",
+  "description": "Mouse sem fio com múltiplos botões programáveis",
+  "price": 350.00,
+  "stock": 20
+}
+
+### 6️⃣ Create product 3 - Teclado
+# @name createKeyboard
+POST {{baseUrl}}/products
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Teclado Mecânico Corsair K95",
+  "description": "Teclado mecânico RGB com switches Cherry MX",
+  "price": 850.00,
+  "stock": 10
+}
+
+### 7️⃣ Create product 4 - Monitor
+# @name createMonitor
+POST {{baseUrl}}/products
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "name": "Monitor LG 27 polegadas 4K",
+  "description": "Monitor UltraFine 27\" com resolução 4K 60Hz",
+  "price": 2200.00,
+  "stock": 8
+}
+
+### 8️⃣ List all products
+# @name listProducts
+GET {{baseUrl}}/products
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 3: SHOPPING CART
+#################################
+
+### 9️⃣ Get empty cart
+# @name getEmptyCart
+GET {{baseUrl}}/cart
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 🔟 Add Notebook to cart (quantity: 1)
+# @name addNotebookCart
+POST {{baseUrl}}/cart/items
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{createNotebook.response.body.id}}",
+  "quantity": 1
+}
+
+### 1️⃣1️⃣ Add Mouse to cart (quantity: 2)
+# @name addMouseCart
+POST {{baseUrl}}/cart/items
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{createMouse.response.body.id}}",
+  "quantity": 2
+}
+
+### 1️⃣2️⃣ Add Keyboard to cart (quantity: 1)
+# @name addKeyboardCart
+POST {{baseUrl}}/cart/items
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{createKeyboard.response.body.id}}",
+  "quantity": 1
+}
+
+### 1️⃣3️⃣ View cart with all items
+# @name viewCart
+GET {{baseUrl}}/cart
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 1️⃣4️⃣ Remove one item from cart
+# @name removeItem
+DELETE {{baseUrl}}/cart/items/{{viewCart.response.body.data.items[0].id}}
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 1️⃣5️⃣ View updated cart
+# @name viewCartAfterRemoval
+GET {{baseUrl}}/cart
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 4: CHECKOUT & ORDERS
+#################################
+
+### 1️⃣6️⃣ Create order (Checkout)
+# @name createOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "shippingAddress": {
+    "street": "Avenida Paulista",
+    "number": "1000",
+    "complement": "Apto 2501",
+    "city": "São Paulo",
+    "state": "SP",
+    "zipCode": "01311-100",
+    "country": "Brasil"
+  },
+  "notes": "Entregar em horário comercial de preferência"
+}
+
+### 1️⃣7️⃣ Get user orders list
+# @name getUserOrders
+GET {{baseUrl}}/orders
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 1️⃣8️⃣ Get order details
+# @name getOrderDetails
+GET {{baseUrl}}/orders/{{createOrder.response.body.data.id}}
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 5: MERCADO PAGO PAYMENTS
+#################################
+
+### 1️⃣9️⃣ Initiate payment with Mercado Pago - Credit Card
+# Métodos suportados: CREDIT_CARD, DEBIT_CARD, PIX, BANK_TRANSFER
+# @name initiatePaymentMercadoPago
+POST {{baseUrl}}/payments
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "orderId": "{{createOrder.response.body.data.id}}",
+  "method": "CREDIT_CARD",
+  "payerData": {
+    "email": "{{registerUser.response.body.user.email}}",
+    "name": "{{registerUser.response.body.user.name}}"
+  }
+}
+
+### 2️⃣0️⃣ Initiate payment - PIX (0 juros, mais rápido)
+# @name initiatePaymentPix
+POST {{baseUrl}}/payments
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "orderId": "{{createOrder.response.body.data.id}}",
+  "method": "PIX",
+  "payerData": {
+    "email": "{{registerUser.response.body.user.email}}",
+    "name": "{{registerUser.response.body.user.name}}"
+  }
+}
+
+### 2️⃣1️⃣ Initiate payment - Debit Card
+# @name initiatePaymentDebit
+POST {{baseUrl}}/payments
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "orderId": "{{createOrder.response.body.data.id}}",
+  "method": "DEBIT_CARD",
+  "payerData": {
+    "email": "{{registerUser.response.body.user.email}}",
+    "name": "{{registerUser.response.body.user.name}}"
+  }
+}
+
+### 2️⃣2️⃣ Initiate payment - Bank Transfer
+# @name initiatePaymentBank
+POST {{baseUrl}}/payments
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "orderId": "{{createOrder.response.body.data.id}}",
+  "method": "BANK_TRANSFER",
+  "payerData": {
+    "email": "{{registerUser.response.body.user.email}}",
+    "name": "{{registerUser.response.body.user.name}}"
+  }
+}
+
+### 2️⃣3️⃣ Get payment status
+# @name getPaymentStatus
+GET {{baseUrl}}/payments/{{initiatePaymentMercadoPago.response.body.data.id}}
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 2️⃣4️⃣ Get payments history of order
+# @name getOrderPayments
+GET {{baseUrl}}/payments/order/{{createOrder.response.body.data.id}}
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 6: WEBHOOKS & NOTIFICATIONS
+#################################
+
+### 2️⃣5️⃣ Webhook - Payment APPROVED (enviado pelo Mercado Pago)
+# Mercado Pago envia automaticamente quando pagamento é aprovado
+# Em desenvolvimento, use ngrok para expor URL pública
+# @name webhookPaymentApproved
+POST {{baseUrl}}/payments/webhook
+Content-Type: application/json
+
+{
+  "type": "payment",
+  "data": {
+    "id": "1234567890"
+  }
+}
+
+### 2️⃣6️⃣ Webhook - Payment DECLINED (enviado pelo Mercado Pago)
+# Mercado Pago envia quando pagamento é recusado
+# @name webhookPaymentDeclined
+POST {{baseUrl}}/payments/webhook
+Content-Type: application/json
+
+{
+  "type": "payment",
+  "data": {
+    "id": "9876543210"
+  }
+}
+
+### 2️⃣7️⃣ Webhook - Payment PENDING (enviado pelo Mercado Pago)
+# Para pagamentos que aguardam processamento (PIX, transferência, etc)
+# @name webhookPaymentPending
+POST {{baseUrl}}/payments/webhook
+Content-Type: application/json
+
+{
+  "type": "payment",
+  "data": {
+    "id": "5555555555"
+  }
+}
+
+### 2️⃣8️⃣ Webhook - Subscription notification (ignored)
+# Mercado Pago também envia notificações de subscriptions
+# Nossa API ignora automaticamente
+POST {{baseUrl}}/payments/webhook
+Content-Type: application/json
+
+{
+  "type": "subscription",
+  "data": {
+    "id": "9999999999"
+  }
+}
+
+
+#################################
+# FASE 7: REFUNDS & CANCELLATIONS
+#################################
+
+### 2️⃣9️⃣ Refund a payment (only APPROVED payments)
+# @name refundPayment
+POST {{baseUrl}}/payments/{{getPaymentStatus.response.body.data.id}}/refund
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "reason": "Cliente solicitou reembolso"
+}
+
+### 3️⃣0️⃣ Cancel order (if not shipped)
+# @name cancelOrder
+PATCH {{baseUrl}}/orders/{{createOrder.response.body.data.id}}/cancel
+Authorization: Bearer {{loginUser.response.body.token}}
+
+
+#################################
+# FASE 8: ERROR SCENARIOS & EDGE CASES
+#################################
+
+### 3️⃣1️⃣ Try to add out-of-stock product
+POST {{baseUrl}}/cart/items
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "productId": "{{createNotebook.response.body.id}}",
+  "quantity": 100
+}
+
+### 3️⃣2️⃣ Try to checkout empty cart
+DELETE {{baseUrl}}/cart
+Authorization: Bearer {{loginUser.response.body.token}}
+
+### 3️⃣3️⃣ Try to pay invalid order
+POST {{baseUrl}}/payments
+Authorization: Bearer {{loginUser.response.body.token}}
+Content-Type: application/json
+
+{
+  "orderId": "00000000-0000-0000-0000-000000000000",
+  "method": "CREDIT_CARD"
+}
+
+
+#################################
+# REFERENCE - DATA MODELS
+#################################
+
+# Payment Methods Supported:
+# - CREDIT_CARD: Cartão de Crédito (até 12x parcelado)
+# - DEBIT_CARD: Cartão de Débito (à vista)
+# - PIX: PIX (à vista, sem juros, em tempo real)
+# - BANK_TRANSFER: Transferência Bancária (à vista)
+
+# Order Status Flow:
+# PENDING_PAYMENT → PAID → PROCESSING → SHIPPED → DELIVERED
+# 
+# Can be cancelled at any point except:
+# - SHIPPED, DELIVERED, CANCELLED
+
+# Payment Status Flow:
+# PENDING → PROCESSING → APPROVED
+#                     → DECLINED
+#                     → CANCELLED
+#
+# From APPROVED: can be REFUNDED
+
+# Mercado Pago Webhook Mapping:
+# pending     → PROCESSING
+# approved    → APPROVED
+# authorized  → PROCESSING
+# in_process  → PROCESSING
+# in_mediation→ PROCESSING
+# rejected    → DECLINED
+# cancelled   → CANCELLED
+# refunded    → REFUNDED
+# charged_back→ CANCELLED
