@@ -15,6 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', routes);
 
 // Sincronizar banco de dados e iniciar servidor
+// Render injeta a porta via process.env.PORT. Não fixe valores.
 const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
@@ -32,7 +33,8 @@ const startServer = async () => {
     // Iniciar servidor
     app.listen(PORT, () => {
       console.log(`✓ Servidor rodando na porta ${PORT}`);
-      console.log(`✓ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      // Comentado para reduzir ruído em produção
+      // console.log(`✓ Ambiente: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {
     console.error('✗ Erro ao iniciar servidor:', error);

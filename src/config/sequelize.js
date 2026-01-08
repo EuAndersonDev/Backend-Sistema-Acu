@@ -5,7 +5,8 @@ const env = process.env.NODE_ENV || 'development';
 const config = dbConfig[env];
 
 // Suporte a conexão via URL completa (DATABASE_URL)
-const databaseUrl = process.env.DATABASE_URL;
+// Preferir config.url (vindo de src/config/database.js) e cair para env
+const databaseUrl = config.url || process.env.DATABASE_URL;
 
 // Detecta necessidade de SSL (Render Postgres e similares)
 const hostCandidate = databaseUrl || config.host || '';
