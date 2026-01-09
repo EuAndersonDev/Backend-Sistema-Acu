@@ -6,6 +6,7 @@ const CartItem = require('./CartItem');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const Payment = require('./Payment');
+const RefreshToken = require('./RefreshToken');
 
 // Relacionamentos Cart
 Cart.hasMany(CartItem, {
@@ -82,6 +83,9 @@ Payment.belongsTo(Order, {
   as: 'order',
 });
 
+// Relacionamentos RefreshToken (já definidos no modelo RefreshToken.js)
+// Apenas importamos aqui para garantir que as associações sejam carregadas
+
 const db = {
   sequelize,
   User,
@@ -91,7 +95,9 @@ const db = {
   Order,
   OrderItem,
   Payment,
+  RefreshToken,
 };
 
 module.exports = db;
+
 

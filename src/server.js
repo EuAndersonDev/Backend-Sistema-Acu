@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
 const db = require('./models');
+const { FORCE } = require('sequelize/lib/index-hints');
 
 const app = express();
 
