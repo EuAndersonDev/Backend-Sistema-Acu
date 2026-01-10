@@ -419,6 +419,9 @@ DB_PASS=sua_senha
 
 JWT_SECRET=sua_chave_secreta_jwt_aqui_mude_em_producao
 JWT_EXPIRES_IN=7d
+
+# Resend (para formulário de contato)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 4. Crie o banco de dados PostgreSQL
@@ -516,6 +519,34 @@ Content-Type: application/json
 DELETE /api/products/:id
 Authorization: Bearer {token}
 ```
+
+### Formulário de Contato (Público)
+
+#### Enviar mensagem de contato
+```http
+POST /api/contact
+Content-Type: application/json
+
+{
+  "name": "João Silva",
+  "email": "joao@email.com",
+  "message": "Gostaria de saber mais sobre seus produtos"
+}
+```
+
+**Resposta de sucesso (200):**
+```json
+{
+  "success": true
+}
+```
+
+**Características:**
+- ✅ Validação de dados (nome mínimo 2 chars, email válido, mensagem mínimo 10 chars)
+- ✅ Rate limiting: 5 requisições por IP a cada 10 minutos
+- ✅ Envio automático de email para o dono do site
+- ✅ Email de confirmação automático para o cliente
+- ✅ Usa Resend (domínio padrão: onboarding@resend.dev)
 
 ## 🔒 Segurança
 
