@@ -3,8 +3,13 @@
 const { MercadoPagoConfig, Preference, Payment } = require('mercadopago');
 
 // Inicializar SDK do Mercado Pago (v2.11.0+)
+// Suporte a variáveis MP_* e fallback para as existentes
+const accessToken = process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN;
+const notificationUrl = process.env.MP_WEBHOOK_URL || process.env.MERCADO_PAGO_NOTIFICATION_URL;
+const webhookSecret = process.env.MP_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || null;
+
 const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+  accessToken,
 });
 
 // Constantes de configuração
@@ -13,7 +18,7 @@ const MERCADO_PAGO_CONFIG = {
   currency: 'BRL',
   
   // URLs de redirecionamento após pagamento
-  notification_url: process.env.MERCADO_PAGO_NOTIFICATION_URL,
+  notification_url: notificationUrl,
   success_url: process.env.PAYMENT_SUCCESS_URL || 'http://localhost:3000/checkout/success',
   failure_url: process.env.PAYMENT_FAILURE_URL || 'http://localhost:3000/checkout/failure',
   pending_url: process.env.PAYMENT_PENDING_URL || 'http://localhost:3000/checkout/pending',
@@ -41,7 +46,7 @@ const MERCADO_PAGO_CONFIG = {
   },
   
   // Webhook secret para validação (opcional)
-  webhook_secret: process.env.WEBHOOK_SECRET || null,
+  webhook_secret: webhookSecret,
   
   // Timeout para requisições
   request_timeout: 30000,

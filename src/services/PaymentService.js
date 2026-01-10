@@ -33,6 +33,9 @@ class PaymentService {
       }
     );
 
+    // Definir externalId como o próprio ID interno para idempotência (external_reference)
+    await PaymentRepository.updatePaymentStatus(payment.id, 'PENDING', payment.id);
+
     try {
       // Chamar Mercado Pago
       if (paymentGateway === 'MERCADO_PAGO') {
@@ -61,6 +64,40 @@ class PaymentService {
   }
 
   /**
+   * Cria somente o registro interno de pagamento (sem chamar gateway)
+   */
+  async createInternalPaymentRecord(orderId, method, payerData = {}, paymentGateway = 'MERCADO_PAGO') {
+    const order = await OrderRepository.findOrderById(orderId);
+
+    if (!order) {
+      throw new Error('Pedido não encontrado');
+    }
+
+    if (order.status !== 'PENDING_PAYMENT') {
+      throw new Error('Pedido não está aguardando pagamento');
+    }
+
+    const payment = await PaymentRepository.createPayment(
+      orderId,
+      order.totalPrice,
+      method,
+      paymentGateway,
+      { initiatedAt: new Date(), payerData }
+    );
+
+    await PaymentRepository.updatePaymentStatus(payment.id, 'PENDING', payment.id);
+
+    return {
+      id: payment.id,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      method: payment.method,
+      gateway: payment.paymentGateway,
+      status: payment.status,
+    };
+  }
+
+  /**
    * Cria preferência de pagamento no Mercado Pago
    */
   async createMercadoPagoPayment(payment, order, payerData, method) {
@@ -84,7 +121,7 @@ class PaymentService {
         failure: `${MERCADO_PAGO_CONFIG.failure_url}/pedidos/${order.id}?payment=failure`,
         pending: `${MERCADO_PAGO_CONFIG.failure_url}/pedidos/${order.id}?payment=pending`,
       },
-      external_reference: payment.id, // ID interno para rastrear
+      external_reference: payment.id, // ID interno para idempotência
       notification_url: MERCADO_PAGO_CONFIG.notification_url,
       statement_descriptor: `ACU STORE`,
       installments: 1,
@@ -104,11 +141,15 @@ class PaymentService {
       const preference = new Preference(client);
       const response = await preference.create({ body: preferenceData });
 
-      // Atualizar pagamento com ID externo do Mercado Pago
-      await PaymentRepository.updatePaymentStatus(
+      // Atualizar pagamento para PROCESSING e salvar dados da preferência em metadata
+      await PaymentRepository.updatePaymentByExternalId(
         payment.id,
         'PROCESSING',
-        response.id // preference_id é o externalId
+        {
+          preferenceId: response.id,
+          initPoint: response.init_point,
+          sandboxInitPoint: response.sandbox_init_point,
+        }
       );
 
       return {
@@ -118,11 +159,11 @@ class PaymentService {
         method: payment.method,
         gateway: payment.paymentGateway,
         status: 'PROCESSING',
-        externalId: response.id,
-        // Link para redirecionar o cliente
-        paymentUrl: response.init_point, // URL pública
-        sandboxUrl: response.sandbox_init_point, // URL sandbox
-        message: 'Redirecione o cliente para o link de pagamento',
+        externalId: payment.id,
+        // Link para redirecionar o cliente (Checkout Pro) — não usado no Checkout API
+        paymentUrl: response.init_point,
+        sandboxUrl: response.sandbox_init_point,
+        message: 'Preferência criada (Checkout Pro). Para Checkout API, use /api/payments/checkout.',
         details: {
           preferenceId: response.id,
           externalReference: payment.id,
@@ -131,6 +172,81 @@ class PaymentService {
     } catch (error) {
       throw new Error(`Erro ao criar preferência Mercado Pago: ${error.message}`);
     }
+  }
+
+  /**
+   * Cria pagamento via Checkout API (PIX ou CARTÃO)
+   */
+  async createMercadoPagoCheckoutPayment(payment, order, payerData, method, paymentData = {}) {
+    const payment_api = new PaymentClass(client);
+
+    const baseBody = {
+      transaction_amount: Number(order.totalPrice),
+      description: `Order #${order.id}`,
+      external_reference: payment.id,
+      notification_url: MERCADO_PAGO_CONFIG.notification_url,
+      payer: {
+        email: payerData.email,
+        identification: payerData.identification || undefined, // { type, number }
+      },
+      metadata: { orderId: order.id },
+    };
+
+    let body = { ...baseBody };
+
+    if (method === 'PIX') {
+      body.payment_method_id = 'pix';
+    } else if (method === 'CREDIT_CARD' || method === 'DEBIT_CARD') {
+      if (!paymentData.token) {
+        throw new Error('Token de cartão ausente para Checkout API');
+      }
+      body.token = paymentData.token;
+      body.installments = paymentData.installments || 1;
+      if (paymentData.issuer_id) body.issuer_id = paymentData.issuer_id;
+      if (paymentData.payment_method_id) body.payment_method_id = paymentData.payment_method_id; // ex.: "visa"
+      body.capture = true;
+    } else {
+      throw new Error('Método não suportado no Checkout API');
+    }
+
+    const response = await payment_api.create({
+      body,
+      requestOptions: { idempotencyKey: String(payment.id) },
+    });
+
+    const mpStatus = this.mapMercadoPagoStatus(response.status);
+
+    // Atualiza pagamento com status e meta (inclui dados PIX se existir)
+    const metadata = {
+      mercadoPagoId: response.id,
+      mercadoPagoStatus: response.status,
+      paymentMethodId: response.payment_method_id,
+      paymentTypeId: response.payment_type_id,
+    };
+    const poi = response.point_of_interaction?.transaction_data;
+    if (poi?.qr_code || poi?.qr_code_base64) {
+      metadata.pix = {
+        qr_code: poi.qr_code || null,
+        qr_code_base64: poi.qr_code_base64 || null,
+      };
+    }
+
+    await PaymentRepository.updatePaymentByExternalId(payment.id, mpStatus, metadata);
+
+    return {
+      id: payment.id,
+      orderId: payment.orderId,
+      amount: payment.amount,
+      method: payment.method,
+      gateway: payment.paymentGateway,
+      status: mpStatus,
+      externalId: payment.id,
+      details: {
+        mpPaymentId: response.id,
+        mpStatus: response.status,
+        pix: metadata.pix || null,
+      },
+    };
   }
 
   /**

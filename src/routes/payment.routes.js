@@ -6,13 +6,19 @@ const router = express.Router();
 
 // Webhook do Mercado Pago - NÃO requer autenticação
 // Mercado Pago envia POST para notificar mudanças de status
-router.post('/webhook', PaymentController.handleWebhook);
+const { validateMercadoPagoSignature } = require('../middlewares/mercadopagoWebhook');
+router.post('/webhook', validateMercadoPagoSignature, PaymentController.handleWebhook);
 
 // Rotas protegidas - requerem JWT
 router.use(authMiddleware);
 
 // Iniciar pagamento
 router.post('/', PaymentController.initiatePayment);
+// Alias: iniciar pagamento em /create
+router.post('/create', PaymentController.initiatePayment);
+
+// Checkout API (PIX/Cartão) gerenciado pelo nosso backend
+router.post('/checkout', PaymentController.checkoutPayment);
 
 // Obter status do pagamento
 router.get('/:paymentId', PaymentController.getPaymentStatus);

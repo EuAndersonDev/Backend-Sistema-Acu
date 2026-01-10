@@ -70,6 +70,35 @@ const handleWebhook = async (req, res) => {
   }
 };
 
+const checkoutPayment = async (req, res) => {
+  try {
+    const { orderId, method, payerData, paymentData } = req.body;
+
+    if (!orderId || !method) {
+      return res.status(400).json({ success: false, error: 'orderId e method são obrigatórios' });
+    }
+
+    const supported = ['PIX', 'CREDIT_CARD', 'DEBIT_CARD'];
+    if (!supported.includes(method)) {
+      return res.status(400).json({ success: false, error: `Método inválido. Suportados: ${supported.join(', ')}` });
+    }
+
+    // Cria registro interno e processa via Checkout API
+    const base = await PaymentService.createInternalPaymentRecord(orderId, method, payerData, 'MERCADO_PAGO');
+    const result = await PaymentService.createMercadoPagoCheckoutPayment({
+      id: base.id,
+      orderId: base.orderId,
+      amount: base.amount,
+      method: base.method,
+      paymentGateway: base.gateway,
+    }, { id: base.orderId, totalPrice: base.amount }, payerData, method, paymentData);
+
+    return res.status(201).json({ success: true, data: result, message: 'Pagamento (Checkout API) criado' });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: error.message });
+  }
+};
+
 const getPaymentStatus = async (req, res) => {
   try {
     const { paymentId } = req.params;
@@ -129,6 +158,7 @@ const getOrderPayments = async (req, res) => {
 module.exports = {
   initiatePayment,
   handleWebhook,
+  checkoutPayment,
   getPaymentStatus,
   refundPayment,
   getOrderPayments,

@@ -9,11 +9,23 @@ const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+// Captura rawBody para validação de assinatura HMAC em webhooks
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true }));
 
 // Rotas
 app.use('/api', routes);
+// Rota de webhooks (fora de /api para seguir padrão)
+try {
+  const webhooksRoutes = require('./routes/webhooks.routes');
+  app.use('/webhooks', webhooksRoutes);
+} catch (e) {
+  // Ignora se rota ainda não existir
+}
 
 // Sincronizar banco de dados e iniciar servidor
 // Render injeta a porta via process.env.PORT. Não fixe valores.
