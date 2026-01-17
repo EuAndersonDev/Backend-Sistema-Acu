@@ -3,29 +3,16 @@ const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
 const db = require('./models');
-const { FORCE } = require('sequelize/lib/index-hints');
 
 const app = express();
 
 // Middlewares
 app.use(cors());
-// Captura rawBody para validação de assinatura HMAC em webhooks
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rotas
 app.use('/api', routes);
-// Rota de webhooks (fora de /api para seguir padrão)
-try {
-  const webhooksRoutes = require('./routes/webhooks.routes');
-  app.use('/webhooks', webhooksRoutes);
-} catch (e) {
-  // Ignora se rota ainda não existir
-}
 
 // Sincronizar banco de dados e iniciar servidor
 // Render injeta a porta via process.env.PORT. Não fixe valores.

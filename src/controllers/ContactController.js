@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const Contact = require('../models/Contact');
 
 // Lazy initialization - Resend é inicializado apenas quando necessário
 let resend = null;
@@ -459,6 +460,13 @@ const sendContactMessage = async (req, res) => {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
     const cleanMessage = message.trim();
+
+    // Persiste mensagem para histórico e auditoria
+    await Contact.create({
+      name: cleanName,
+      email: cleanEmail,
+      message: cleanMessage,
+    });
 
     // Envia somente para o dono da loja (confirmação ao cliente desativada)
     await sendEmailToOwner(cleanName, cleanEmail, cleanMessage);

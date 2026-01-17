@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const RefreshToken = require('../models/RefreshToken');
-const { Op } = require('sequelize');
+
+// Armazena refresh tokens em memória para evitar dependência de tabela dedicada
+const refreshTokenStore = new Map();
 
 /**
  * Gera um Access Token JWT
@@ -29,39 +30,37 @@ const generateRefreshToken = (userId) => {
   );
 };
 
-/**
- * Salva o Refresh Token no banco de dados
- * @param {string} userId - ID do usuário
- * @param {string} token - Refresh Token
- * @returns {Promise<RefreshToken>}
- */
-const saveRefreshToken = async (userId, token) => {
-  // Decodifica o token para obter a data de expiração
+// Helpers de refresh tokens em memória
+const registerRefreshToken = (userId, token) => {
   const decoded = jwt.decode(token);
-  const expiresAt = new Date(decoded.exp * 1000);
+  const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : null;
+  refreshTokenStore.set(token, { userId, expiresAt });
+};
 
-  // Deleta tokens antigos do usuário (opcional - limita a 5 tokens por usuário)
-  const userTokens = await RefreshToken.findAll({
-    where: { userId },
-    order: [['createdAt', 'DESC']],
-  });
-
-  if (userTokens.length >= 5) {
-    // Remove os tokens mais antigos
-    const tokensToDelete = userTokens.slice(4);
-    await RefreshToken.destroy({
-      where: {
-        id: { [Op.in]: tokensToDelete.map(t => t.id) },
-      },
-    });
+const isRefreshTokenValid = (token, userId) => {
+  const entry = refreshTokenStore.get(token);
+  if (!entry || entry.userId !== userId) {
+    return false;
   }
 
-  // Salva o novo refresh token
-  return await RefreshToken.create({
-    userId,
-    token,
-    expiresAt,
-  });
+  if (entry.expiresAt && entry.expiresAt < new Date()) {
+    refreshTokenStore.delete(token);
+    return false;
+  }
+
+  return true;
+};
+
+const revokeRefreshToken = (token) => {
+  refreshTokenStore.delete(token);
+};
+
+const revokeAllUserTokens = (userId) => {
+  for (const [storedToken, data] of refreshTokenStore.entries()) {
+    if (data.userId === userId) {
+      refreshTokenStore.delete(storedToken);
+    }
+  }
 };
 
 const register = async (req, res) => {
@@ -121,8 +120,8 @@ const login = async (req, res) => {
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
 
-    // Salva o refresh token no banco de dados
-    await saveRefreshToken(user.id, refreshToken);
+    // Armazena o refresh token em memória
+    registerRefreshToken(user.id, refreshToken);
 
     return res.json({
       accessToken,
@@ -146,53 +145,43 @@ const refresh = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
-    // Valida se o refresh token foi enviado
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token é obrigatório' });
     }
 
-    // Verifica a assinatura do JWT
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
     } catch (error) {
       if (error.name === 'TokenExpiredError') {
+        revokeRefreshToken(refreshToken);
         return res.status(401).json({ error: 'Refresh token expirado' });
       }
       return res.status(401).json({ error: 'Refresh token inválido' });
     }
 
-    // Verifica se é realmente um refresh token
     if (decoded.type !== 'refresh') {
       return res.status(401).json({ error: 'Token inválido - use um refresh token' });
     }
 
-    // Verifica se o token existe no banco de dados
-    const tokenRecord = await RefreshToken.findOne({
-      where: { token: refreshToken },
-      include: [{
-        model: User,
-        as: 'user',
-        attributes: ['id', 'name', 'email'],
-      }],
-    });
-
-    if (!tokenRecord) {
+    if (!isRefreshTokenValid(refreshToken, decoded.id)) {
       return res.status(401).json({ error: 'Refresh token não encontrado ou revogado' });
     }
 
-    // Verifica se o token está expirado
-    if (tokenRecord.isExpired()) {
-      await tokenRecord.destroy();
-      return res.status(401).json({ error: 'Refresh token expirado' });
+    const user = await User.findByPk(decoded.id, {
+      attributes: ['id', 'name', 'email'],
+    });
+
+    if (!user) {
+      revokeRefreshToken(refreshToken);
+      return res.status(404).json({ error: 'Usuário não encontrado' });
     }
 
-    // Gera um novo access token
     const newAccessToken = generateAccessToken(decoded.id);
 
     return res.json({
       accessToken: newAccessToken,
-      user: tokenRecord.user,
+      user,
     });
   } catch (error) {
     console.error('Erro ao renovar token:', error);
@@ -207,19 +196,15 @@ const logout = async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
-    // Valida se o refresh token foi enviado
     if (!refreshToken) {
       return res.status(400).json({ error: 'Refresh token é obrigatório' });
     }
 
-    // Busca e deleta o token do banco de dados
-    const deleted = await RefreshToken.destroy({
-      where: { token: refreshToken },
-    });
-
-    if (deleted === 0) {
+    if (!refreshTokenStore.has(refreshToken)) {
       return res.status(404).json({ error: 'Refresh token não encontrado' });
     }
+
+    revokeRefreshToken(refreshToken);
 
     return res.json({ message: 'Logout realizado com sucesso' });
   } catch (error) {
@@ -233,12 +218,9 @@ const logout = async (req, res) => {
  */
 const logoutAll = async (req, res) => {
   try {
-    const userId = req.userId; // Obtido do middleware de autenticação
+    const userId = req.userId;
 
-    // Deleta todos os refresh tokens do usuário
-    await RefreshToken.destroy({
-      where: { userId },
-    });
+    revokeAllUserTokens(userId);
 
     return res.json({ message: 'Logout de todos os dispositivos realizado com sucesso' });
   } catch (error) {
