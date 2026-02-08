@@ -8,9 +8,6 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get('/', ProductController.index);
-router.get('/:id', ProductController.show);
-router.post('/', ProductController.store);
-router.put('/:id', ProductController.update);
-router.delete('/:id', ProductController.destroy);
+router.get('/:ml_id', ProductController.show);
 
 module.exports = router;

@@ -2,18 +2,15 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/sequelize');
 
 const Product = sequelize.define('Product', {
-  id: {
-    type: DataTypes.UUID,
-    primaryKey: true,
-    defaultValue: DataTypes.UUIDV4,
-  },
-  name: {
+  ml_id: {
     type: DataTypes.STRING,
+    primaryKey: true,
+    unique: true,
     allowNull: false,
   },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true,
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false,
   },
   price: {
     type: DataTypes.DECIMAL(10, 2),
@@ -22,13 +19,32 @@ const Product = sequelize.define('Product', {
       min: 0,
     },
   },
-  stock: {
+  currency_id: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  available_quantity: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
+    allowNull: true,
     validate: {
       min: 0,
     },
+  },
+  permalink: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  thumbnail: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  status: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  last_updated: {
+    type: DataTypes.DATE,
+    allowNull: true,
   },
 }, {
   tableName: 'products',
